@@ -21,7 +21,7 @@ function setReceiver(id){
 
 function chatboxSend({receiverId, message}) { 
     // update receiver
-    setReceiver(receiverId);
+    setReceiver(receiverId+"");
 
     const chatboxElement = document.getElementsByClassName('chat-box__chat-textarea')[0];
     const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
@@ -115,7 +115,7 @@ var userMessageMap$ = chat$.pipe(
     rxjs.operators.map(lastMsg => {
         return {
             sender: lastMsg.sender,
-            senderUserId: lastMsg.senderId+"",
+            senderUserId: lastMsg.senderId,
             message: lastMsg.chatMsgs.slice(-1)[0],
         }
     }),
@@ -126,25 +126,40 @@ var versionCommand$ = userMessageMap$.pipe(
 )
 
 var versionReply$ = versionCommand$.pipe(
-    rxjs.operators.map(({ senderUserId }) =>({ receiverId:senderUserId,message:`🤖💔 BreakoutRoomBot ${BREAKOUT_ROOM_BOT_VERSION}\ngithub.com/nelsonjchen/HackyZoomBreakoutBot`})})
+    rxjs.operators.map(({ senderUserId }) =>(
+        { receiverId:senderUserId,message:`🤖💔 BreakoutRoomBot ${BREAKOUT_ROOM_BOT_VERSION}\ngithub.com/nelsonjchen/HackyZoomBreakoutBot`}
+        ))
+
 )
 
-// var breakoutRoomListCommand$ = userMessageMap$.pipe(
-//     rxjs.operators.filter(({ message }) => message == "!ls"),
-// )
+var versionReplySubscription = versionReply$.subscribe(
+    (reply) => chatboxSend(reply)
+)
 
-// var breakoutRoomListReply$ = breakoutRoomListCommand$.pipe(
-//     rxjs.operators.withLatestFrom(
-//         store$,
-//         (_, storeState) =>
-//             "📜 Breakout Room List\n" +
-//             "ID. Room Name (Attendee(s) in Room)\n=============\n" +
-//             storeState.breakoutRoom.roomList.map(
-//                 (room, index) => `⬛ ${index + 1}. ${room.name} (${storeState.attendeesList.attendeesList.filter(attendee => attendee.bid == room.boId).length} attendee(s))`
-//             ).join('\n') +
-//             "\n" 
-//     ),
-// )
+var breakoutRoomListCommand$ = userMessageMap$.pipe(
+    rxjs.operators.filter(({ message }) => message.trim() == "!ls"),
+)
+
+var breakoutRoomListReply$ = breakoutRoomListCommand$.pipe(
+    rxjs.operators.withLatestFrom(
+        store$,
+        ({senderUserId }, storeState) =>({
+            receiverId:senderUserId,
+            message:"📜 Breakout Room List\n" +
+            "ID. Room Name (Attendee(s) in Room)\n=============\n" +
+            storeState.breakoutRoom.roomList.map(
+                (room, index) => `⬛ ${index + 1}. ${room.name} (${storeState.attendeesList.attendeesList.filter(attendee => attendee.bid == room.boId).length} attendee(s))`
+            ).join('\n') +
+            "\n" 
+        })
+            
+    ),
+)
+
+var breakoutRoomListReplySubscription = breakoutRoomListReply$.subscribe(
+    (message) =>{ 
+        return chatboxSend(message)}
+)
 
 // var breakoutRoomListUsersInRoomReply$ = userMessageMap$.pipe(
 //     rxjs.operators.filter(({ message }) => /!ls (.+)/.test(message)),
@@ -240,179 +255,154 @@ var versionReply$ = versionCommand$.pipe(
 //     }),
 // )
 
-// var chatMoveRequestCommand$ = userMessageMap$.pipe(
-//     rxjs.operators.filter(({ message }) => message.startsWith("!mv ")),
-// )
-
-// var moveRequestQueryFromChat$ = chatMoveRequestCommand$.pipe(
-//     rxjs.operators.map(({ sender, message, senderUserId }) => {
-//         const regex = /!mv (.+)/;
-//         var targetRoomQuery = message.match(regex)[1]
-//         return {
-//             sender: sender,
-//             senderUserId: senderUserId,
-//             targetRoomQuery: targetRoomQuery,
-//             src: 'chat'
-//         }
-//     }),
-// )
-
-// var moveRequestQuery$ = rxjs.merge(
-//     moveRequestQueryFromChat$,
-//     moveRequestQueryFromNameChange$,
-//     moveRequestQueryFromInitialNames$,
-// )
-
-// var [moveRequestSimpleIdQuery$, moveRequestStringQuery$] = moveRequestQuery$.pipe(
-//     rxjs.operators.partition(({ targetRoomQuery }) => /^\d+$/.test(targetRoomQuery))
-// )
-
-// var moveRequestSimpleIdQueryResolved$ = moveRequestSimpleIdQuery$.pipe(
-//     rxjs.operators.withLatestFrom(
-//         store$,
-//         ({ sender, targetRoomQuery, src, senderUserId }, storeState) => {
-//             var roomIndex = parseInt(targetRoomQuery, 10);
-
-//             if (roomIndex == 0 || roomIndex > storeState.breakoutRoom.roomList.length) {
-//                 return { error: `⚠️ (from ${src})\n @${sender} Room ID "${targetRoomQuery}" out of range!\n` }
-//             }
-
-//             var room = storeState.breakoutRoom.roomList[roomIndex - 1]
-
-//             var roomName = room.name
-//             var roomUuid = room.boId
-
-//             return { sender, roomName, src, senderUserId, roomUuid }
-//         }
-//     ),
-// )
-
-// var moveRequestStringQueryResolved$ = moveRequestStringQuery$.pipe(
-//     rxjs.operators.withLatestFrom(
-//         store$,
-//         ({ sender, targetRoomQuery, src, senderUserId }, storeState) => {
-//             var results = fuzzysort.go(targetRoomQuery, storeState.breakoutRoom.roomList, { key: 'name' });
-//             if (results.length == 0) {
-//                 return { error: `⚠️ (from ${src})\n @${sender} No names matched for query: ${targetRoomQuery}!\n` }
-//             }
-//             var roomName = results[0].obj.name;
-//             var roomUuid = results[0].obj.boId;
-
-//             return { sender, roomName, src, senderUserId, roomUuid }
-//         }
-//     ),
-// )
-
-// var moveRequestResolved$ = rxjs.merge(
-//     moveRequestSimpleIdQueryResolved$,
-//     moveRequestStringQueryResolved$,
-// )
-
-// var [moveRequestResolveError$, moveRequestResolved$] = moveRequestResolved$.pipe(
-//     rxjs.operators.partition(({ error }) => error),
-// )
-
-
-// var moveRequestChecked$ = moveRequestResolved$.pipe(
-//     rxjs.operators.withLatestFrom(
-//         store$,
-//         ({ sender, roomName, src, senderUserId, roomUuid }, storeState) => {
-//             var guidSenderMap = new Map(
-//                 storeState.attendeesList.attendeesList.map(
-//                     attendee => [attendee.userGUID, attendee.displayName]
-//                 )
-//             );
-
-//             var room = storeState.breakoutRoom.roomList.filter(room => room.name == roomName)[0]
-//             var roomAttendeesByName = room.attendeeIdList.map(attendeeId => guidSenderMap.get(attendeeId));
-
-//             if (roomAttendeesByName.includes(sender) && src == 'initialName') {
-//                 // Don't return errors
-//                 return null
-//             }
-
-//             if (roomAttendeesByName.includes(sender)) {
-//                 return { error: `⚠️ (from ${src})\n "${sender}" already in "${room.name}"\n` }
-//             }
-
-//             return { sender, roomName, src, senderUserId, roomUuid }
-//         }
-//     ),
-//     rxjs.operators.filter(item =>
-//         item != null
-//     )
-// )
-
-// var [moveRequestInvalidError$, moveRequestValid$] = moveRequestChecked$.pipe(
-//     rxjs.operators.partition(({ error }) => error),
-// )
-
-// var moveRequestValidTimeSlice$ = rxjs.interval(10);
-
-// var moveRequestValidTimeSliceQueue$ = rxjs.zip(moveRequestValid$, moveRequestValidTimeSlice$).pipe(
-//     rxjs.operators.map(([s, _d]) => s)
-// )
-
-// var moveRequestError$ = rxjs.merge(
-//     moveRequestResolveError$,
-//     moveRequestInvalidError$,
-// )
-
-// var moveRequestErrorsAndSuccess$ = rxjs.merge(
-//     moveRequestError$,
-//     moveRequestValidTimeSliceQueue$
-// )
-
-// var moveFulfillChatResponse$ = new rxjs.Subject();
-
-// var moveFulfillChatResponseBuffered$ = moveFulfillChatResponse$.pipe(
-//     rxjs.operators.bufferTime(1000),
-//     rxjs.operators.filter(messages => messages.length != 0),
-//     rxjs.operators.map(messages => {
-//         if (messages.length == 1) {
-//             return messages[0]
-//         } else {
-//             return `🎯🎯🎯 Assigned ${messages.length} users over the last second.\n❓ Attendees may need to press the Breakout Rooms button to join their newly assigned breakout room.\n`
-//         }
-//     })
-// );
-
-// SUBSCRIPTIONS
-
-var versionReplySubscription = versionReply$.subscribe(
-    (reply) => chatboxSend(reply)
+var chatMoveRequestCommand$ = userMessageMap$.pipe(
+    rxjs.operators.filter(({ message }) => message.startsWith("!mv ")),
 )
 
-// var breakoutRoomListReplySubscription = breakoutRoomListReply$.subscribe(
-//     (message) =>{ 
-//         return chatboxSend(message)}
-// )
+var moveRequestQueryFromChat$ = chatMoveRequestCommand$.pipe(
+    rxjs.operators.map(({ sender, message, senderUserId }) => {
+        const regex = /!mv (.+)/;
+        var targetRoomQuery = message.match(regex)[1]
+        return {
+            sender: sender,
+            senderUserId: senderUserId,
+            targetRoomQuery: targetRoomQuery,
+            src: 'chat'
+        }
+    }),
+)
+
+var moveRequestQuery$ = rxjs.merge(
+    moveRequestQueryFromChat$,
+    // moveRequestQueryFromNameChange$,
+    // moveRequestQueryFromInitialNames$,
+)
+
+var [moveRequestSimpleIdQuery$, moveRequestStringQuery$] = moveRequestQuery$.pipe(
+    rxjs.operators.partition(({ targetRoomQuery }) => /^\d+$/.test(targetRoomQuery))
+)
+
+var moveRequestSimpleIdQueryResolved$ = moveRequestSimpleIdQuery$.pipe(
+    rxjs.operators.withLatestFrom(
+        store$,
+        ({ sender, targetRoomQuery, src, senderUserId }, storeState) => {
+            var roomIndex = parseInt(targetRoomQuery, 10);
+
+            if (roomIndex == 0 || roomIndex > storeState.breakoutRoom.roomList.length) {
+                return { error: `⚠️ (from ${src})\n @${sender} Room ID "${targetRoomQuery}" out of range!\n`, senderUserId }
+            }
+
+            var room = storeState.breakoutRoom.roomList[roomIndex - 1]
+
+            var roomName = room.name
+            var roomUuid = room.boId
+
+            return { sender, roomName, src, senderUserId, roomUuid }
+        }
+    ),
+)
+
+var moveRequestStringQueryResolved$ = moveRequestStringQuery$.pipe(
+    rxjs.operators.withLatestFrom(
+        store$,
+        ({ sender, targetRoomQuery, src, senderUserId }, storeState) => {
+            var results = fuzzysort.go(targetRoomQuery, storeState.breakoutRoom.roomList, { key: 'name' });
+            if (results.length == 0) {
+                return { error: `⚠️ (from ${src})\n @${sender} No names matched for query: ${targetRoomQuery}!\n`, senderUserId }
+            }
+            var roomName = results[0].obj.name;
+            var roomUuid = results[0].obj.boId;
+
+            return { sender, roomName, src, senderUserId, roomUuid }
+        }
+    ),
+)
+
+var moveRequestResolved$ = rxjs.merge(
+    moveRequestSimpleIdQueryResolved$,
+    moveRequestStringQueryResolved$,
+)
+
+var [moveRequestResolveError$, moveRequestResolved$] = moveRequestResolved$.pipe(
+    rxjs.operators.partition(({ error }) => error),
+)
+
+
+var moveRequestChecked$ = moveRequestResolved$.pipe(
+    rxjs.operators.withLatestFrom(
+        store$,
+        ({ sender, roomName, src, senderUserId, roomUuid }, storeState) => {
+            var guidSenderMap = new Map(
+                storeState.attendeesList.attendeesList.map(
+                    attendee => [attendee.userGUID, attendee.displayName]
+                )
+            );
+
+            var room = storeState.breakoutRoom.roomList.filter(room => room.name == roomName)[0]
+            var roomAttendeesByName = room.attendeeIdList.map(attendeeId => guidSenderMap.get(attendeeId));
+
+            if (roomAttendeesByName.includes(sender) && src == 'initialName') {
+                // Don't return errors
+                return null
+            }
+
+            if (roomAttendeesByName.includes(sender)) {
+                return { error: `⚠️ (from ${src})\n "${sender}" already in "${room.name}"\n`, senderUserId }
+            }
+
+            return { sender, roomName, src, senderUserId, roomUuid }
+        }
+    ),
+    rxjs.operators.filter(item =>
+        item != null
+    )
+)
+
+var [moveRequestInvalidError$, moveRequestValid$] = moveRequestChecked$.pipe(
+    rxjs.operators.partition(({ error }) => error),
+)
+
+var moveRequestValidTimeSlice$ = rxjs.interval(10);
+
+var moveRequestValidTimeSliceQueue$ = rxjs.zip(moveRequestValid$, moveRequestValidTimeSlice$).pipe(
+    rxjs.operators.map(([s, _d]) => s)
+)
+
+var moveRequestError$ = rxjs.merge(
+    moveRequestResolveError$,
+    moveRequestInvalidError$,
+)
+
+var moveRequestErrorsAndSuccess$ = rxjs.merge(
+    moveRequestError$,
+    moveRequestValidTimeSliceQueue$
+)
+
+
+
+// SUBSCRIPTIONS
 
 // var breakoutRoomListReplySubscription = breakoutRoomListUsersInRoomReply$.subscribe(
 //     (message) => chatboxSend(message)
 // )
 
-// var moveRequestFulfillNotifySubscription = moveRequestErrorsAndSuccess$.subscribe(
-//     ({ sender, roomName, src, error, senderUserId, roomUuid }) => {
-//         if (error) {
-//             chatboxSend(error);
-//             return;
-//         }
-//         try {
-//             // ~ 2ms
-//             assignUserIdToBreakoutRoomUuid(senderUserId, roomUuid)
-//             moveFulfillChatResponse$.next(`🎯 (from ${src})\n Assigning\n👤 "${sender}"\nto\n⬛ "${roomName}"\n` +
-//                 "❓ Attendee may need to press the Breakout Rooms button\n to join the newly assigned breakout meeting.\n❓ Chat \"!ls\" to list rooms and other commands.\n")
-//         } catch {
+var moveRequestFulfillNotifySubscription = moveRequestErrorsAndSuccess$.subscribe(
+    ({ sender, roomName, src, error, senderUserId, roomUuid }) => {
+        if (error) {
+            chatboxSend({message: error, receiverId: senderUserId});
+            return;
+        }
+        try {
+            // ~ 2ms
+            assignUserIdToBreakoutRoomUuid(senderUserId, roomUuid)
+            chatboxSend({receiverId:senderUserId, message:`🎯 (from ${src})\n Assigning\n👤 "${sender}"\nto\n⬛ "${roomName}"\n` +"❓ Attendee may need to press the Breakout Rooms button\n to join the newly assigned breakout meeting.\n❓"})
+        } catch {
 
-//         }
-//     }
-// )
+        }
+    }
+)
 
-// var moveFullfillChatResponseSubscription = moveFulfillChatResponseBuffered$.subscribe(message => {
-//     // ~ 30ms
-//     chatboxSend(message)
-// })
+
 
 // Open the chat pane if it isn't already open.
 var chatPaneButton = document.querySelector('[aria-label^="open the chat pane"]')
