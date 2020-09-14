@@ -2,6 +2,11 @@ BREAKOUT_ROOM_BOT_VERSION = "2020.09.7"
 
 // HELPER FUNCTIONS 
 
+var internalStore = document.getElementById('root')._reactRootContainer._internalRoot.current.child.pendingProps.store;
+
+var store$ = getStoreObservable(internalStore)
+
+
 function getStoreObservable(store) {
     return new rxjs.Observable(function (observer) {
         const unsubscribe = store.subscribe(function () {
@@ -21,7 +26,14 @@ function setReceiver(id){
 
 function chatboxSend({receiverId, message}) { 
     // update receiver
-    setReceiver(receiverId+"");
+    // setReceiver(receiverId+"");
+    internalStore.dispatch({
+        type: 'UPDATE_CHAT_RECEIVER',
+        payload: {
+            receiver: '<bot changed>',
+            receiverId: receiverId
+        }
+    })  
 
     const chatboxElement = document.getElementsByClassName('chat-box__chat-textarea')[0];
     const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
@@ -95,10 +107,6 @@ function waitForElm(selector) {
 }
 
 // OBSERVABLES
-
-var internalStore = document.getElementById('root')._reactRootContainer._internalRoot.current.child.pendingProps.store;
-
-var store$ = getStoreObservable(internalStore)
 
 var chat$ = store$.pipe(
     rxjs.operators.map(s => {
@@ -411,7 +419,7 @@ if (chatPaneButton) {
 }
 
 setTimeout(_ => {
-    chatboxSend({receiverId:"0",message:`Welcome to zoom call`})
+    chatboxSend({receiverId:0,message:`Welcome to zoom call`})
 }, 100)
 
 // Move users after bot initialization
